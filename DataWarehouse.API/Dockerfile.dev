@@ -1,0 +1,20 @@
+# Dev container uses only the SDK (no separate runtime stage)
+FROM mcr.microsoft.com/dotnet/sdk:8.0
+WORKDIR /src
+
+# Watching inside containers (esp. on macOS/Windows)
+ENV DOTNET_USE_POLLING_FILE_WATCHER=1
+ENV ASPNETCORE_URLS=http://+:8080
+
+COPY DataWarehouse.Models/DataWarehouse.Models.csproj ./DataWarehouse.Models/
+COPY DataWarehouse.API/DataWarehouse.API.csproj ./DataWarehouse.API/
+RUN dotnet restore ./DataWarehouse.API/DataWarehouse.API.csproj
+
+COPY . .
+
+# Expose dev port
+EXPOSE 8080
+
+# Run with hot reload (no launch profile so we respect ASPNETCORE_URLS)
+WORKDIR /src/DataWarehouse.API
+ENTRYPOINT ["dotnet", "watch", "run", "--no-launch-profile", "--urls", "http://0.0.0.0:8080"]

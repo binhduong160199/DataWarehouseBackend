@@ -7,27 +7,34 @@ using DataWarehouse.API.Extensions;
 
 var builder = WebApplication.CreateBuilder(args);
 
+builder.Logging.ClearProviders();
+builder.Logging.AddLog4Net("log4net.config");
+
 // Load appsettings.json & environment config
 builder.ConfigureAppSettings();
 
-// Register services
+// --- DB: register DbContext (so repos can inject ApplicationDbContext directly)
+builder.Services.AddDbContext<ApplicationDbContext>(options =>
+{
+    var cs = builder.Configuration.GetConnectionString("DefaultConnection")
+             ?? throw new InvalidOperationException("Missing connection string: DefaultConnection");
+    options.UseNpgsql(cs);
+});
+
+// App services
 builder.Services.RegisterCoreServices(builder.Configuration);
 builder.Services.RegisterRepositories();
 builder.Services.RegisterBusinessServices();
 builder.Services.RegisterJwtAuthentication(builder.Configuration);
 builder.Services.RegisterCors();
 
-// Log4Net setup (optional)
+// Log4Net setup (optional legacy init; safe to keep)
 var logRepository = LogManager.GetRepository(Assembly.GetEntryAssembly());
 XmlConfigurator.Configure(logRepository, new FileInfo("log4net.config"));
 
-// Register DbContext (use factory for testing/mocking if needed)
-builder.Services.AddDbContextFactory<ApplicationDbContext>(options =>
-    options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
-
 var app = builder.Build();
 
-// Dev environment middleware
+// Dev env middleware
 if (app.Environment.IsDevelopment())
 {
     app.UseDeveloperExceptionPage();
@@ -42,10 +49,8 @@ else
 
 app.UseHttpsRedirection();
 app.UseRouting();
-app.UseMiddleware<GlobalExceptionMiddleware>();
 app.UseCors("AllowFrontendOnly");
 app.UseAuthentication();
-app.UseMiddleware<RoleMiddleware>();
 app.UseAuthorization();
 
 app.MapControllers();
@@ -53,4 +58,4 @@ app.MapGet("/", () => "Hello from DataWarehouse!");
 
 app.Run();
 
-public partial class Program { } // Required for EF CLI tooling
+public partial class Program { }
