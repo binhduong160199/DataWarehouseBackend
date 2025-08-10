@@ -23,5 +23,12 @@ namespace DataWarehouse.API.Controller.Users
             var profile = await _userService.RegisterAsync(dto, currentUser);
             return Ok(profile);
         }
+        
+        [HttpPost("login")]
+        public async Task<IActionResult> Login([FromBody] LoginDto dto)
+        {
+            var auth = await _userService.LoginAsync(dto);
+            return Ok(auth);
+        }
     }
 }

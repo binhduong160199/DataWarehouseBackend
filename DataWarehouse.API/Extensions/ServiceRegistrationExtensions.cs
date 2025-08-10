@@ -8,6 +8,7 @@ using DataWarehouse.API.Services.Implementation.Users;
 using DataWarehouse.API.Services.Interfaces.Companies;
 using DataWarehouse.API.Services.Interfaces.Users;
 using DataWarehouse.API.Utils.Hash;
+using DataWarehouse.API.Utils.Jwt;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 
@@ -39,6 +40,7 @@ public static class ServiceRegistrationExtensions
     {
         services.AddScoped<IUserService, UserService>();
         services.AddScoped<ICompanyService, CompanyService>();
+        services.AddScoped<IJwtUtility, JwtUtility>();
     }
 
     public static void RegisterJwtAuthentication(this IServiceCollection services, IConfiguration config)
