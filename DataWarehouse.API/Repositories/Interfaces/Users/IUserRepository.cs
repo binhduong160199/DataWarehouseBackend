@@ -7,6 +7,9 @@ namespace DataWarehouse.API.Repositories.Interfaces.Users
         Task<User?> GetByUsernameAsync(string username);
         Task<User?> GetByIdAsync(Guid id);
         Task AddUserAsync(User user);
+        Task UpdateUserAsync(User user);
+        Task DeleteUserAsync(User user);
         Task<bool> UserExistsAsync(string username);
+        Task<int> CountCompanyAdminsAsync(Guid companyId);
     }
 }

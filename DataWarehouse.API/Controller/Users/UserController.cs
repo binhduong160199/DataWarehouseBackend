@@ -21,14 +21,54 @@ namespace DataWarehouse.API.Controller.Users
             _env = env;
         }
 
+        [HttpGet("{id:guid}")]
+        [Authorize]
+        public async Task<IActionResult> GetById([FromRoute] Guid id)
+        {
+            var requester = HttpContext.User.GetUserIdentity();
+            if (requester is null) return Unauthorized();
+
+            var isAdmin = string.Equals(requester.Role, "Admin", StringComparison.OrdinalIgnoreCase);
+            var isSelf  = requester.Id == id;
+
+            if (!isAdmin && !isSelf)
+                return Forbid(); // 403
+
+            var dto = await _userService.GetByIdAsync(id);
+            if (dto is null) return NotFound();
+
+            return Ok(dto);
+        }
+        
         [HttpPost("register")]
+        [AllowAnonymous] 
         public async Task<IActionResult> Register([FromBody] RegisterUserDto dto)
         {
-            var currentUser = HttpContext.User.GetUserIdentity();
+            var currentUser = HttpContext.User.GetUserIdentity(); 
             var profile = await _userService.RegisterAsync(dto, currentUser);
             return Ok(profile);
         }
 
+        [HttpPut("{id:guid}")]
+        [Authorize]
+        public async Task<IActionResult> Update([FromRoute] Guid id, [FromBody] UpdateUserDto dto)
+        {
+            var requester = HttpContext.User.GetUserIdentity();
+            if (requester is null) return Unauthorized();
+            var updated = await _userService.UpdateAsync(id, dto, requester);
+            return Ok(updated);
+        }
+
+        [HttpDelete("{id:guid}")]
+        [Authorize]
+        public async Task<IActionResult> Delete([FromRoute] Guid id)
+        {
+            var requester = HttpContext.User.GetUserIdentity();
+            if (requester is null) return Unauthorized();
+            await _userService.DeleteAsync(id, requester);
+            return NoContent();
+        }
+        
         [HttpPost("login")]
         [AllowAnonymous]
         public async Task<IActionResult> Login([FromBody] LoginDto dto)
