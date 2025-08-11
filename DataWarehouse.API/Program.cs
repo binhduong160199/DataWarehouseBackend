@@ -26,7 +26,7 @@ builder.Services.RegisterCoreServices(builder.Configuration);
 builder.Services.RegisterRepositories();
 builder.Services.RegisterBusinessServices();
 builder.Services.RegisterJwtAuthentication(builder.Configuration);
-builder.Services.RegisterCors();
+builder.Services.RegisterCors(builder.Configuration);
 
 // Log4Net setup (optional legacy init; safe to keep)
 var logRepository = LogManager.GetRepository(Assembly.GetEntryAssembly());
