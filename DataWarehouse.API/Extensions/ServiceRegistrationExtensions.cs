@@ -9,6 +9,7 @@ using DataWarehouse.API.Services.Interfaces.Companies;
 using DataWarehouse.API.Services.Interfaces.Users;
 using DataWarehouse.API.Utils.Hash;
 using DataWarehouse.API.Utils.Jwt;
+using DataWarehouse.Utils.Redis;                 
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 
@@ -23,10 +24,8 @@ public static class ServiceRegistrationExtensions
             {
                 options.JsonSerializerOptions.Converters.Add(new System.Text.Json.Serialization.JsonStringEnumConverter());
             });
-
         services.AddEndpointsApiExplorer();
         services.AddSwaggerGen();
-
         services.AddScoped<IHashUtility, HashUtility>();
     }
 
@@ -40,7 +39,8 @@ public static class ServiceRegistrationExtensions
     {
         services.AddScoped<IUserService, UserService>();
         services.AddScoped<ICompanyService, CompanyService>();
-        services.AddScoped<IJwtUtility, JwtUtility>();
+        services.AddSingleton<IJwtUtility, JwtUtility>();
+        services.AddSingleton<RedisHelper>();
     }
 
     public static void RegisterJwtAuthentication(this IServiceCollection services, IConfiguration config)
@@ -48,33 +48,37 @@ public static class ServiceRegistrationExtensions
         var key = Encoding.ASCII.GetBytes(config["Jwt:Key"] ?? throw new Exception("JWT Key missing"));
 
         services.AddAuthentication(options =>
-        {
-            options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
-            options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
-        })
-        .AddJwtBearer(options =>
-        {
-            options.RequireHttpsMetadata = false;
-            options.SaveToken = true;
-            options.TokenValidationParameters = new TokenValidationParameters
             {
-                ValidateIssuerSigningKey = true,
-                IssuerSigningKey = new SymmetricSecurityKey(key),
-                ValidateIssuer = false,
-                ValidateAudience = false
-            };
-        });
+                options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
+                options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
+            })
+            .AddJwtBearer(options =>
+            {
+                options.RequireHttpsMetadata = false; 
+                options.SaveToken = true;
+                options.TokenValidationParameters = new TokenValidationParameters
+                {
+                    ValidateIssuerSigningKey = true,
+                    IssuerSigningKey = new SymmetricSecurityKey(key),
+                    ValidateIssuer = false,
+                    ValidateAudience = false,
+                    ValidateLifetime = true,
+                    ClockSkew = TimeSpan.FromMinutes(1)
+                };
+            });
     }
 
-    public static void RegisterCors(this IServiceCollection services)
+    public static void RegisterCors(this IServiceCollection services, IConfiguration config)
     {
+        var origins = config.GetSection("Cors:AllowedOrigins").Get<string[]>() ?? Array.Empty<string>();
         services.AddCors(options =>
         {
             options.AddPolicy("AllowFrontendOnly", builder =>
             {
-                builder.AllowAnyOrigin()
-                       .AllowAnyHeader()
-                       .AllowAnyMethod();
+                builder.WithOrigins(origins)
+                    .AllowAnyHeader()
+                    .AllowAnyMethod()
+                    .AllowCredentials(); // Needed for cookies in cross-site requests
             });
         });
     }

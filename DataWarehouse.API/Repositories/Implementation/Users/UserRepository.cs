@@ -18,6 +18,13 @@ namespace DataWarehouse.API.Repositories.Implementation.Users
         {
             return await _context.Users.Include(u => u.Company).FirstOrDefaultAsync(u => u.Username == username);
         }
+        
+        public async Task<User?> GetByIdAsync(Guid id)
+        {
+            return await _context.Users
+                .Include(u => u.Company)
+                .FirstOrDefaultAsync(u => u.Id == id);
+        }
 
         public async Task AddUserAsync(User user)
         {

@@ -6,6 +6,8 @@ namespace DataWarehouse.API.Services.Interfaces.Users
     public interface IUserService
     {
         Task<UserProfileDto> RegisterAsync(RegisterUserDto dto, IUserIdentity? currentUser = null);
-        Task<AuthResponseDto> LoginAsync(LoginDto dto);
+        Task<AuthResponseDto> LoginAsync(LoginDto dto);              
+        Task<AuthResponseDto> RefreshAsync(string refreshToken);       
+        Task LogoutAsync(string refreshToken);                       
     }
 }
