@@ -30,14 +30,37 @@ namespace DataWarehouse.API.Services.Implementation.Users
             _redis = redis;
         }
 
+        public async Task<UserProfileDto?> GetByIdAsync(Guid id)
+        {
+            var user = await _users.GetByIdAsync(id);
+            return user == null ? null : ToProfile(user);
+        }
+        
         public async Task<UserProfileDto> RegisterAsync(RegisterUserDto dto, IUserIdentity? currentUser)
         {
-            var isCreatingUser = dto.Role == "User";
-            if (isCreatingUser && (!dto.IsAdminCreating || currentUser?.Role != "Admin"))
-                throw new Exception("Only an admin can create a normal user.");
-
             if (await _users.UserExistsAsync(dto.Username))
                 throw new Exception("Username already exists.");
+            
+            var newRole = Enum.TryParse<UserRole>(dto.Role, true, out var parsedRole) ? parsedRole : UserRole.User;
+
+            var companyAdminCount = await _users.CountCompanyAdminsAsync(dto.CompanyId);
+
+            if (currentUser is null)
+            {
+                // Only allowed if company has ZERO admins and the new user is Admin
+                if (companyAdminCount > 0)
+                    throw new Exception("An admin already exists for this company. Authentication required.");
+
+                if (newRole != UserRole.Admin)
+                    throw new Exception("The first account for a company must be an Admin.");
+                // allow creating first Admin without a token
+            }
+            else
+            {
+                var isRequesterAdmin = string.Equals(currentUser.Role, "Admin", StringComparison.OrdinalIgnoreCase);
+                if (!isRequesterAdmin)
+                    throw new Exception("Only admin can create users.");
+            }
 
             var user = new User
             {
@@ -50,11 +73,74 @@ namespace DataWarehouse.API.Services.Implementation.Users
                 PhoneNumber = dto.PhoneNumber,
                 Birthday = dto.Birthday,
                 CompanyId = dto.CompanyId,
-                Role = Enum.TryParse<UserRole>(dto.Role, true, out var parsedRole) ? parsedRole : UserRole.User
+                Role = newRole
             };
 
             await _users.AddUserAsync(user);
             return ToProfile(user);
+        }
+        
+        public async Task<UserProfileDto> UpdateAsync(Guid targetUserId, UpdateUserDto dto, IUserIdentity requester)
+        {
+            var target = await _users.GetByIdAsync(targetUserId) ?? throw new Exception("User not found.");
+            var isAdmin = string.Equals(requester.Role, "Admin", StringComparison.OrdinalIgnoreCase);
+            var isSelf  = requester.Id == targetUserId;
+
+            if (!isAdmin && !isSelf) throw new Exception("Forbidden.");
+
+            // basic fields (both admin & self can change these)
+            if (!string.IsNullOrWhiteSpace(dto.FirstName))   target.FirstName = dto.FirstName;
+            if (!string.IsNullOrWhiteSpace(dto.LastName))    target.LastName  = dto.LastName;
+            if (!string.IsNullOrWhiteSpace(dto.Email))       target.Email     = dto.Email;
+            if (!string.IsNullOrWhiteSpace(dto.PhoneNumber)) target.PhoneNumber = dto.PhoneNumber;
+            if (dto.Birthday.HasValue)                       target.Birthday  = dto.Birthday;
+
+            if (!string.IsNullOrWhiteSpace(dto.NewPassword))
+            {
+                if (!isSelf && !isAdmin) throw new Exception("Forbidden.");
+                target.PasswordHash = _hash.HashPassword(dto.NewPassword);
+            }
+
+            // Role changes:
+            if (!string.IsNullOrWhiteSpace(dto.Role))
+            {
+                if (!isAdmin)
+                    throw new Exception("Only admin can change roles.");
+
+                if (!Enum.TryParse<UserRole>(dto.Role, true, out var newRole))
+                    throw new Exception("Invalid role.");
+
+                // if demoting an Admin -> User, ensure not the last admin
+                if (target.Role == UserRole.Admin && newRole != UserRole.Admin)
+                {
+                    var adminCount = await _users.CountCompanyAdminsAsync(target.CompanyId);
+                    if (adminCount <= 1)
+                        throw new Exception("Operation blocked: at least one admin must remain in the company.");
+                }
+
+                target.Role = newRole;
+            }
+
+            await _users.UpdateUserAsync(target);
+            return ToProfile(target);
+        }
+
+        public async Task DeleteAsync(Guid targetUserId, IUserIdentity requester)
+        {
+            var target = await _users.GetByIdAsync(targetUserId);
+            if (target == null) return;
+
+            var isAdmin = string.Equals(requester.Role, "Admin", StringComparison.OrdinalIgnoreCase);
+            if (!isAdmin) throw new Exception("Forbidden.");
+
+            if (target.Role == UserRole.Admin)
+            {
+                var adminCount = await _users.CountCompanyAdminsAsync(target.CompanyId);
+                if (adminCount <= 1)
+                    throw new Exception("Operation blocked: cannot delete the last admin in the company.");
+            }
+
+            await _users.DeleteUserAsync(target);
         }
 
         public async Task<AuthResponseDto> LoginAsync(LoginDto dto)
