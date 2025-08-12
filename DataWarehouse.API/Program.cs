@@ -10,31 +10,24 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Logging.ClearProviders();
 builder.Logging.AddLog4Net("log4net.config");
 
-// Load appsettings.json & environment config
 builder.ConfigureAppSettings();
 
-// --- DB: register DbContext (so repos can inject ApplicationDbContext directly)
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
-{
-    var cs = builder.Configuration.GetConnectionString("DefaultConnection")
-             ?? throw new InvalidOperationException("Missing connection string: DefaultConnection");
-    options.UseNpgsql(cs);
-});
+    options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
 
-// App services
 builder.Services.RegisterCoreServices(builder.Configuration);
 builder.Services.RegisterRepositories();
 builder.Services.RegisterBusinessServices();
 builder.Services.RegisterJwtAuthentication(builder.Configuration);
 builder.Services.RegisterCors(builder.Configuration);
 
-// Log4Net setup (optional legacy init; safe to keep)
+builder.Services.RegisterGraphQl(builder.Configuration);
+
 var logRepository = LogManager.GetRepository(Assembly.GetEntryAssembly());
 XmlConfigurator.Configure(logRepository, new FileInfo("log4net.config"));
 
 var app = builder.Build();
 
-// Dev env middleware
 if (app.Environment.IsDevelopment())
 {
     app.UseDeveloperExceptionPage();
@@ -52,6 +45,8 @@ app.UseRouting();
 app.UseCors("AllowFrontendOnly");
 app.UseAuthentication();
 app.UseAuthorization();
+
+app.MapGraphQL("/graphql");
 
 app.MapControllers();
 app.MapGet("/", () => "Hello from DataWarehouse!");
