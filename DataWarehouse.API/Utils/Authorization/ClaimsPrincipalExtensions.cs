@@ -5,33 +5,18 @@ namespace DataWarehouse.API.Utils.Authorization
 {
     public static class ClaimsPrincipalExtensions
     {
-        public static IUserIdentity? GetUserIdentity(this ClaimsPrincipal user)
+        public static IUserIdentity? GetUserIdentity(this ClaimsPrincipal principal)
         {
-            if (user?.Identity == null || !user.Identity.IsAuthenticated)
-                return null;
+            if (principal?.Identity?.IsAuthenticated != true) return null;
 
-            var idClaim = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-            var username = user.FindFirst(ClaimTypes.Name)?.Value;
-            var role = user.FindFirst(ClaimTypes.Role)?.Value;
+            var id = principal.FindFirstValue(ClaimTypes.NameIdentifier);
+            var name = principal.FindFirstValue(ClaimTypes.Name) ?? string.Empty;
+            var role = principal.FindFirstValue(ClaimTypes.Role) ?? "User";
 
-            if (string.IsNullOrEmpty(idClaim) || string.IsNullOrEmpty(username) || string.IsNullOrEmpty(role))
-                return null;
-
-            return new SimpleUserIdentity(Guid.Parse(idClaim), username, role);
+            if (!Guid.TryParse(id, out var guid)) return null;
+            return new Identity(guid, name, role);
         }
 
-        private class SimpleUserIdentity : IUserIdentity
-        {
-            public SimpleUserIdentity(Guid id, string username, string role)
-            {
-                Id = id;
-                Username = username;
-                Role = role;
-            }
-
-            public Guid Id { get; }
-            public string Username { get; }
-            public string Role { get; }
-        }
+        private sealed record Identity(Guid Id, string Username, string Role) : IUserIdentity;
     }
 }

@@ -12,6 +12,8 @@ using DataWarehouse.API.Utils.Jwt;
 using DataWarehouse.Utils.Redis;                 
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
+using DataWarehouse.API.GraphQL;
+using DataWarehouse.API.GraphQL.Users;
 
 namespace DataWarehouse.API.Extensions;
 
@@ -27,6 +29,9 @@ public static class ServiceRegistrationExtensions
         services.AddEndpointsApiExplorer();
         services.AddSwaggerGen();
         services.AddScoped<IHashUtility, HashUtility>();
+        services.AddSingleton<IJwtUtility, JwtUtility>();
+        services.AddHttpContextAccessor();
+        services.AddAuthorization();
     }
 
     public static void RegisterRepositories(this IServiceCollection services)
@@ -39,7 +44,6 @@ public static class ServiceRegistrationExtensions
     {
         services.AddScoped<IUserService, UserService>();
         services.AddScoped<ICompanyService, CompanyService>();
-        services.AddSingleton<IJwtUtility, JwtUtility>();
         services.AddSingleton<RedisHelper>();
     }
 
@@ -75,11 +79,36 @@ public static class ServiceRegistrationExtensions
         {
             options.AddPolicy("AllowFrontendOnly", builder =>
             {
-                builder.WithOrigins(origins)
-                    .AllowAnyHeader()
-                    .AllowAnyMethod()
-                    .AllowCredentials(); // Needed for cookies in cross-site requests
+                if (origins.Length > 0)
+                {
+                    builder.WithOrigins(origins)
+                        .AllowAnyHeader()
+                        .AllowAnyMethod()
+                        .AllowCredentials();
+                }
+                else
+                {
+                    // No credentials when allowing any origin
+                    builder.AllowAnyOrigin()
+                        .AllowAnyHeader()
+                        .AllowAnyMethod();
+                }
             });
         });
+    }
+    
+    public static void RegisterGraphQl(this IServiceCollection services, IConfiguration config)
+    {
+        services
+            .AddGraphQLServer()
+            .AddAuthorization()                 
+            .AddQueryType<Query>()              
+            .AddMutationType<Mutation>()        
+            .AddTypeExtension<UserQueries>()   
+            .AddTypeExtension<UserMutations>()  
+            .AddProjections()
+            .AddFiltering()
+            .AddSorting()
+            .ModifyRequestOptions(o => o.IncludeExceptionDetails = true);
     }
 }
