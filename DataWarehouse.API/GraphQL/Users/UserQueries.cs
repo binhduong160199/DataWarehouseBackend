@@ -17,7 +17,7 @@ namespace DataWarehouse.API.GraphQL.Users
             if (!Guid.TryParse(idValue, out var id)) return null;
             return await users.GetByIdAsync(id);
         }
-        
+
         [Authorize(Roles = new[] { "Admin" })]
         public Task<UserProfileDto?> UserById(
             Guid id,
