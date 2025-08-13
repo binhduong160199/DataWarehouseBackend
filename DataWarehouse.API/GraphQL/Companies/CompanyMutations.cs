@@ -30,7 +30,14 @@ public class CompanyMutations
             Id = Guid.NewGuid(),
             Name = input.Name,
             Address = input.Address,
-            Website = input.Website
+            Website = input.Website,
+            ContactEmail = input.ContactEmail,
+            PhoneNumber = input.PhoneNumber,
+            Industry = input.Industry,
+            TaxId = input.TaxId,
+            LogoUrl = input.LogoUrl,
+            CreatedAt = DateTime.UtcNow,
+            IsActive = true
         };
 
         db.Companies.Add(entity);
@@ -55,9 +62,13 @@ public class CompanyMutations
                 .Build());
         }
 
-        if (input.Name is not null) entity.Name = input.Name;
-        if (input.Address is not null) entity.Address = input.Address;
-        if (input.Website is not null) entity.Website = input.Website;
+        if (input.ContactEmail is not null) entity.ContactEmail = input.ContactEmail;
+        if (input.PhoneNumber is not null) entity.PhoneNumber = input.PhoneNumber;
+        if (input.Industry is not null) entity.Industry = input.Industry;
+        if (input.TaxId is not null) entity.TaxId = input.TaxId;
+        if (input.LogoUrl is not null) entity.LogoUrl = input.LogoUrl;
+        if (input.IsActive.HasValue) entity.IsActive = input.IsActive.Value;
+        entity.UpdatedAt = DateTime.UtcNow;
 
         await db.SaveChangesAsync(ct);
         return entity;

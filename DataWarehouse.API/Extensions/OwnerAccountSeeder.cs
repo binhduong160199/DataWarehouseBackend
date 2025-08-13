@@ -20,20 +20,33 @@ public static class OwnerAccountSeeder
         var ownerExists = await db.Users.AnyAsync(u => u.Role == UserRole.Owner);
         if (ownerExists) return;
 
-        var ownerUsername = config["OwnerAccount:Username"];
-        var ownerPassword = config["OwnerAccount:Password"];
-        var ownerEmail = config["OwnerAccount:Email"];
+        string? GetConfig(string key)
+        {
+            var value = config[$"OwnerAccount:{key}"];
+            return string.IsNullOrWhiteSpace(value) || value.Trim().ToLower() == "null" ? null : value.Trim();
+        }
 
         var ownerUser = new User
         {
             Id = Guid.NewGuid(),
-            Username = ownerUsername,
-            PasswordHash = hash.HashPassword(ownerPassword!),
+            Username = GetConfig("Username")!,
+            PasswordHash = hash.HashPassword(GetConfig("Password")!),
             FirstName = "Binh Duong",
             LastName = "Nguyen",
-            Email = ownerEmail,
+            Email = GetConfig("Email"),
+            PhoneNumber = GetConfig("PhoneNumber"),
+            Birthday = DateTime.TryParse(GetConfig("Birthday"), out var bday)
+                ? DateTime.SpecifyKind(bday, DateTimeKind.Utc)
+                : null,
+            JobTitle = GetConfig("JobTitle"),
+            Department = GetConfig("Department"),
+            ProfileImageUrl = GetConfig("ProfileImageUrl"),
             Role = UserRole.Owner,
-            CompanyId = null
+            CompanyId = null,
+            CreatedAt = DateTime.UtcNow,
+            UpdatedAt = DateTime.UtcNow,
+            LastLoginAt = DateTime.UtcNow,
+            IsActive = true
         };
 
         db.Users.Add(ownerUser);

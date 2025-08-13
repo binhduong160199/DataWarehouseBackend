@@ -9,6 +9,9 @@ namespace DataWarehouse.API.GraphQL.Users
         string? Email,
         string? PhoneNumber,
         DateTime? Birthday,
+        string? JobTitle,
+        string? Department,
+        string? ProfileImageUrl,
         string Role = "User"
     );
 

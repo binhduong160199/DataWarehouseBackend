@@ -22,7 +22,15 @@ namespace DataWarehouse.API.Services.Implementation.Companies
                 Id = c.Id,
                 Name = c.Name,
                 Address = c.Address,
-                Website = c.Website
+                Website = c.Website,
+                ContactEmail = c.ContactEmail,
+                PhoneNumber = c.PhoneNumber,
+                Industry = c.Industry,
+                TaxId = c.TaxId,
+                LogoUrl = c.LogoUrl,
+                IsActive = c.IsActive,
+                CreatedAt = c.CreatedAt,
+                UpdatedAt = c.UpdatedAt
             });
         }
 
@@ -36,7 +44,15 @@ namespace DataWarehouse.API.Services.Implementation.Companies
                 Id = company.Id,
                 Name = company.Name,
                 Address = company.Address,
-                Website = company.Website
+                Website = company.Website,
+                ContactEmail = company.ContactEmail,
+                PhoneNumber = company.PhoneNumber,
+                Industry = company.Industry,
+                TaxId = company.TaxId,
+                LogoUrl = company.LogoUrl,
+                IsActive = company.IsActive,
+                CreatedAt = company.CreatedAt,
+                UpdatedAt = company.UpdatedAt
             };
         }
 
@@ -47,7 +63,14 @@ namespace DataWarehouse.API.Services.Implementation.Companies
                 Id = Guid.NewGuid(),
                 Name = dto.Name,
                 Address = dto.Address,
-                Website = dto.Website
+                Website = dto.Website,
+                ContactEmail = dto.ContactEmail,
+                PhoneNumber = dto.PhoneNumber,
+                Industry = dto.Industry,
+                TaxId = dto.TaxId,
+                LogoUrl = dto.LogoUrl,
+                IsActive = true,
+                CreatedAt = DateTime.UtcNow
             };
 
             await _repo.AddAsync(company);
@@ -57,7 +80,15 @@ namespace DataWarehouse.API.Services.Implementation.Companies
                 Id = company.Id,
                 Name = company.Name,
                 Address = company.Address,
-                Website = company.Website
+                Website = company.Website,
+                ContactEmail = company.ContactEmail,
+                PhoneNumber = company.PhoneNumber,
+                Industry = company.Industry,
+                TaxId = company.TaxId,
+                LogoUrl = company.LogoUrl,
+                IsActive = company.IsActive,
+                CreatedAt = company.CreatedAt,
+                UpdatedAt = company.UpdatedAt
             };
         }
 
@@ -69,6 +100,12 @@ namespace DataWarehouse.API.Services.Implementation.Companies
             existing.Name = dto.Name;
             existing.Address = dto.Address;
             existing.Website = dto.Website;
+            existing.ContactEmail = dto.ContactEmail;
+            existing.PhoneNumber = dto.PhoneNumber;
+            existing.Industry = dto.Industry;
+            existing.TaxId = dto.TaxId;
+            existing.LogoUrl = dto.LogoUrl;
+            existing.UpdatedAt = DateTime.UtcNow;
 
             await _repo.UpdateAsync(existing);
 
@@ -77,7 +114,15 @@ namespace DataWarehouse.API.Services.Implementation.Companies
                 Id = existing.Id,
                 Name = existing.Name,
                 Address = existing.Address,
-                Website = existing.Website
+                Website = existing.Website,
+                ContactEmail = existing.ContactEmail,
+                PhoneNumber = existing.PhoneNumber,
+                Industry = existing.Industry,
+                TaxId = existing.TaxId,
+                LogoUrl = existing.LogoUrl,
+                IsActive = existing.IsActive,
+                CreatedAt = existing.CreatedAt,
+                UpdatedAt = existing.UpdatedAt
             };
         }
 

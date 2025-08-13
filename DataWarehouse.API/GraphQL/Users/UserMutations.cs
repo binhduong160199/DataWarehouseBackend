@@ -10,7 +10,7 @@ namespace DataWarehouse.API.GraphQL.Users
     {
         private const string RefreshCookieName = "refresh_token";
         private static readonly TimeSpan RefreshTtl = TimeSpan.FromDays(7);
-        
+
         public async Task<UserProfileDto> Register(
             RegisterUserInput input,
             [Service] IUserService users,
@@ -25,6 +25,9 @@ namespace DataWarehouse.API.GraphQL.Users
                 Email = input.Email,
                 PhoneNumber = input.PhoneNumber,
                 Birthday = input.Birthday,
+                JobTitle = input.JobTitle,
+                Department = input.Department,
+                ProfileImageUrl = input.ProfileImageUrl,
                 CompanyId = input.CompanyId,
                 Role = input.Role,
                 IsAdminCreating = true
@@ -54,7 +57,7 @@ namespace DataWarehouse.API.GraphQL.Users
 
             return auth;
         }
-        
+
         public async Task<AuthResponseDto> Refresh(
             [Service] IUserService users,
             [Service] IHttpContextAccessor accessor)
@@ -72,7 +75,7 @@ namespace DataWarehouse.API.GraphQL.Users
 
             return auth;
         }
-        
+
         public async Task<bool> Logout(
             [Service] IUserService users,
             [Service] IHttpContextAccessor accessor)
@@ -91,3 +94,4 @@ namespace DataWarehouse.API.GraphQL.Users
         }
     }
 }
+

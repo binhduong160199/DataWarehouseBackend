@@ -11,17 +11,22 @@ namespace DataWarehouse.API.Data.Configurations
             builder.ToTable("users");
 
             builder.HasKey(u => u.Id);
-
             builder.HasIndex(u => u.Username).IsUnique();
 
             builder.Property(u => u.Role)
-                .HasConversion<string>() 
+                .HasConversion<string>()
                 .IsRequired();
+
+            builder.Property(u => u.CreatedAt)
+                .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+            builder.Property(u => u.UpdatedAt)
+                .HasDefaultValueSql("CURRENT_TIMESTAMP");
 
             builder.HasOne(u => u.Company)
                 .WithMany(c => c.Users)
                 .HasForeignKey(u => u.CompanyId)
-                .IsRequired(false) 
+                .IsRequired(false)
                 .OnDelete(DeleteBehavior.Restrict);
         }
     }
