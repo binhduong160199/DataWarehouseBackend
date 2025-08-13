@@ -8,50 +8,59 @@ namespace DataWarehouse.API.Repositories.Implementation.Users
 {
     public class UserRepository : IUserRepository
     {
-        private readonly ApplicationDbContext _context;
+        private readonly IDbContextFactory<ApplicationDbContext> _dbContextFactory;
 
-        public UserRepository(ApplicationDbContext context)
+        public UserRepository(IDbContextFactory<ApplicationDbContext> dbContextFactory)
         {
-            _context = context;
+            _dbContextFactory = dbContextFactory;
         }
 
         public async Task<User?> GetByUsernameAsync(string username)
         {
-            return await _context.Users.Include(u => u.Company).FirstOrDefaultAsync(u => u.Username == username);
+            await using var db = await _dbContextFactory.CreateDbContextAsync();
+            return await db.Users.Include(u => u.Company)
+                .FirstOrDefaultAsync(u => u.Username == username);
         }
-        
+
         public async Task<User?> GetByIdAsync(Guid id)
         {
-            return await _context.Users
+            await using var db = await _dbContextFactory.CreateDbContextAsync();
+            return await db.Users
                 .Include(u => u.Company)
                 .FirstOrDefaultAsync(u => u.Id == id);
         }
 
         public async Task AddUserAsync(User user)
         {
-            _context.Users.Add(user);
-            await _context.SaveChangesAsync();
+            await using var db = await _dbContextFactory.CreateDbContextAsync();
+            db.Users.Add(user);
+            await db.SaveChangesAsync();
         }
 
         public async Task UpdateUserAsync(User user)
         {
-            _context.Users.Update(user);
-            await _context.SaveChangesAsync();
+            await using var db = await _dbContextFactory.CreateDbContextAsync();
+            db.Users.Update(user);
+            await db.SaveChangesAsync();
         }
 
         public async Task DeleteUserAsync(User user)
         {
-            _context.Users.Remove(user);
-            await _context.SaveChangesAsync();
+            await using var db = await _dbContextFactory.CreateDbContextAsync();
+            db.Users.Remove(user);
+            await db.SaveChangesAsync();
         }
+
         public async Task<bool> UserExistsAsync(string username)
         {
-            return await _context.Users.AnyAsync(u => u.Username == username);
+            await using var db = await _dbContextFactory.CreateDbContextAsync();
+            return await db.Users.AnyAsync(u => u.Username == username);
         }
-        
+
         public async Task<int> CountCompanyAdminsAsync(Guid companyId)
         {
-            return await _context.Users
+            await using var db = await _dbContextFactory.CreateDbContextAsync();
+            return await db.Users
                 .Where(u => u.CompanyId == companyId && u.Role == UserRole.Admin)
                 .CountAsync();
         }

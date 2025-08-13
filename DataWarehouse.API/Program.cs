@@ -12,7 +12,7 @@ builder.Logging.AddLog4Net("log4net.config");
 
 builder.ConfigureAppSettings();
 
-builder.Services.AddDbContext<ApplicationDbContext>(options =>
+builder.Services.AddPooledDbContextFactory<ApplicationDbContext>(options =>
     options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
 
 builder.Services.RegisterCoreServices(builder.Configuration);
@@ -20,7 +20,6 @@ builder.Services.RegisterRepositories();
 builder.Services.RegisterBusinessServices();
 builder.Services.RegisterJwtAuthentication(builder.Configuration);
 builder.Services.RegisterCors(builder.Configuration);
-
 builder.Services.RegisterGraphQl(builder.Configuration);
 
 var logRepository = LogManager.GetRepository(Assembly.GetEntryAssembly());
@@ -28,11 +27,11 @@ XmlConfigurator.Configure(logRepository, new FileInfo("log4net.config"));
 
 var app = builder.Build();
 
+await OwnerAccountSeeder.SeedOwnerAccountAsync(app.Services);
+
 if (app.Environment.IsDevelopment())
 {
     app.UseDeveloperExceptionPage();
-    app.UseSwagger();
-    app.UseSwaggerUI();
 }
 else
 {
@@ -47,8 +46,6 @@ app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapGraphQL("/graphql");
-
-app.MapControllers();
 app.MapGet("/", () => "Hello from DataWarehouse!");
 
 app.Run();

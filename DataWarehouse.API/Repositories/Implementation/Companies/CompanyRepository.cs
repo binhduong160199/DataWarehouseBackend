@@ -7,35 +7,44 @@ namespace DataWarehouse.API.Repositories.Implementation.Companies
 {
     public class CompanyRepository : ICompanyRepository
     {
-        private readonly ApplicationDbContext _context;
+        private readonly IDbContextFactory<ApplicationDbContext> _contextFactory;
 
-        public CompanyRepository(ApplicationDbContext context)
+        public CompanyRepository(IDbContextFactory<ApplicationDbContext> contextFactory)
         {
-            _context = context;
+            _contextFactory = contextFactory;
         }
 
         public async Task<IEnumerable<Company>> GetAllAsync()
-            => await _context.Companies.ToListAsync();
+        {
+            await using var context = await _contextFactory.CreateDbContextAsync();
+            return await context.Companies.ToListAsync();
+        }
 
         public async Task<Company?> GetByIdAsync(Guid id)
-            => await _context.Companies.FindAsync(id);
+        {
+            await using var context = await _contextFactory.CreateDbContextAsync();
+            return await context.Companies.FindAsync(id);
+        }
 
         public async Task AddAsync(Company company)
         {
-            _context.Companies.Add(company);
-            await _context.SaveChangesAsync();
+            await using var context = await _contextFactory.CreateDbContextAsync();
+            context.Companies.Add(company);
+            await context.SaveChangesAsync();
         }
 
         public async Task UpdateAsync(Company company)
         {
-            _context.Companies.Update(company);
-            await _context.SaveChangesAsync();
+            await using var context = await _contextFactory.CreateDbContextAsync();
+            context.Companies.Update(company);
+            await context.SaveChangesAsync();
         }
 
         public async Task DeleteAsync(Company company)
         {
-            _context.Companies.Remove(company);
-            await _context.SaveChangesAsync();
+            await using var context = await _contextFactory.CreateDbContextAsync();
+            context.Companies.Remove(company);
+            await context.SaveChangesAsync();
         }
     }
 }

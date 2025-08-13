@@ -13,6 +13,7 @@ using DataWarehouse.Utils.Redis;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 using DataWarehouse.API.GraphQL;
+using DataWarehouse.API.GraphQL.Companies;
 using DataWarehouse.API.GraphQL.Users;
 
 namespace DataWarehouse.API.Extensions;
@@ -26,8 +27,6 @@ public static class ServiceRegistrationExtensions
             {
                 options.JsonSerializerOptions.Converters.Add(new System.Text.Json.Serialization.JsonStringEnumConverter());
             });
-        services.AddEndpointsApiExplorer();
-        services.AddSwaggerGen();
         services.AddScoped<IHashUtility, HashUtility>();
         services.AddSingleton<IJwtUtility, JwtUtility>();
         services.AddHttpContextAccessor();
@@ -106,6 +105,9 @@ public static class ServiceRegistrationExtensions
             .AddMutationType<Mutation>()        
             .AddTypeExtension<UserQueries>()   
             .AddTypeExtension<UserMutations>()  
+            .AddTypeExtension<CompanyQueries>() 
+            .AddTypeExtension<CompanyMutations>()
+            .AddType<CompanyType>() 
             .AddProjections()
             .AddFiltering()
             .AddSorting()
