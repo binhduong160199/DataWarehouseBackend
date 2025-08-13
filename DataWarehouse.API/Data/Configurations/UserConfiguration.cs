@@ -1,5 +1,4 @@
 using DataWarehouse.Models.Entities;
-using DataWarehouse.Models.Interfaces;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
@@ -22,7 +21,8 @@ namespace DataWarehouse.API.Data.Configurations
             builder.HasOne(u => u.Company)
                 .WithMany(c => c.Users)
                 .HasForeignKey(u => u.CompanyId)
-                .OnDelete(DeleteBehavior.Cascade);
+                .IsRequired(false) 
+                .OnDelete(DeleteBehavior.Restrict);
         }
     }
 }

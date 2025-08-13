@@ -16,7 +16,7 @@ namespace DataWarehouse.Models.Entities
         public string? PhoneNumber { get; set; }
         public DateTime? Birthday { get; set; }
 
-        public Guid CompanyId { get; set; }
+        public Guid? CompanyId { get; set; }
         public Company Company { get; set; } = null!;
         
         public UserRole Role { get; set; }
