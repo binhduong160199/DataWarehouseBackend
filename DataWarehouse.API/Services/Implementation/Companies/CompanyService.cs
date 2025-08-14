@@ -1,9 +1,11 @@
 using DataWarehouse.API.Repositories.Interfaces.Companies;
 using DataWarehouse.API.Services.Interfaces.Companies;
+using DataWarehouse.API.Utils.Authorization;
 using DataWarehouse.API.Utils.Mapping;
 using DataWarehouse.API.Utils.Redis;
 using DataWarehouse.Models.DTOs;
 using DataWarehouse.Models.Entities;
+using DataWarehouse.Models.Interfaces;
 
 namespace DataWarehouse.API.Services.Implementation.Companies
 {
@@ -52,8 +54,11 @@ namespace DataWarehouse.API.Services.Implementation.Companies
             return dto;
         }
 
-        public async Task<CompanyDto> CreateAsync(CreateUpdateCompanyDto dto)
+        public async Task<CompanyDto> CreateAsync(CreateUpdateCompanyDto dto, IUserIdentity requester)
         {
+            if (!RoleCheck.IsOwner(requester))
+                throw new Exception("Only Owner can create a company.");
+
             var company = new Company
             {
                 Id = Guid.NewGuid(),
@@ -77,8 +82,11 @@ namespace DataWarehouse.API.Services.Implementation.Companies
             return CompanyMapping.ToDto(company);
         }
 
-        public async Task<CompanyDto?> UpdateAsync(Guid id, CreateUpdateCompanyDto dto)
+        public async Task<CompanyDto?> UpdateAsync(Guid id, CreateUpdateCompanyDto dto, IUserIdentity requester)
         {
+            if (!RoleCheck.IsAdmin(requester) && !RoleCheck.IsOwner(requester))
+                throw new Exception("Only Admin or Owner can update a company.");
+
             var existing = await _repo.GetByIdAsync(id);
             if (existing == null)
             {
@@ -107,8 +115,11 @@ namespace DataWarehouse.API.Services.Implementation.Companies
             return CompanyMapping.ToDto(existing);
         }
 
-        public async Task<bool> DeleteAsync(Guid id)
+        public async Task<bool> DeleteAsync(Guid id, IUserIdentity requester)
         {
+            if (!RoleCheck.IsOwner(requester))
+                throw new Exception("Only Owner can delete a company.");
+
             var company = await _repo.GetByIdAsync(id);
             if (company == null)
             {
