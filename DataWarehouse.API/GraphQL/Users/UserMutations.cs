@@ -1,7 +1,8 @@
 using System.Security.Claims;
 using DataWarehouse.API.Services.Interfaces.Users;
 using DataWarehouse.Models.DTOs;
-using DataWarehouse.API.Utils.Authorization; 
+using DataWarehouse.API.Utils.Authorization;
+using HotChocolate.Authorization;
 
 namespace DataWarehouse.API.GraphQL.Users
 {
@@ -11,6 +12,7 @@ namespace DataWarehouse.API.GraphQL.Users
         private const string RefreshCookieName = "refresh_token";
         private static readonly TimeSpan RefreshTtl = TimeSpan.FromDays(7);
 
+        [Authorize]
         public async Task<UserProfileDto> Register(
             RegisterUserInput input,
             [Service] IUserService users,
@@ -37,6 +39,7 @@ namespace DataWarehouse.API.GraphQL.Users
             return await users.RegisterAsync(dto, requester);
         }
 
+        [Authorize]
         public async Task<UserProfileDto> UpdateUser(
             Guid userId,
             UpdateUserInput input,
@@ -63,6 +66,7 @@ namespace DataWarehouse.API.GraphQL.Users
             return await users.UpdateAsync(userId, dto, requester);
         }
         
+        [Authorize]
         public async Task<bool> DeleteUser(
             Guid userId,
             [Service] IUserService users,
