@@ -21,7 +21,7 @@ namespace DataWarehouse.API.GraphQL.Companies
             d.Field(x => x.CreatedAt).Type<DateTimeType>();
             d.Field(x => x.UpdatedAt).Type<DateTimeType>();
 
-            d.Ignore(x => x.Users); // still ignore navigation property
+            d.Ignore(x => x.Users); 
         }
     }
 }

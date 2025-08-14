@@ -9,12 +9,12 @@ using DataWarehouse.API.Services.Interfaces.Companies;
 using DataWarehouse.API.Services.Interfaces.Users;
 using DataWarehouse.API.Utils.Hash;
 using DataWarehouse.API.Utils.Jwt;
-using DataWarehouse.Utils.Redis;                 
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 using DataWarehouse.API.GraphQL;
 using DataWarehouse.API.GraphQL.Companies;
 using DataWarehouse.API.GraphQL.Users;
+using DataWarehouse.API.Utils.Redis;
 
 namespace DataWarehouse.API.Extensions;
 

@@ -3,11 +3,11 @@ using DataWarehouse.API.Repositories.Interfaces.Users;
 using DataWarehouse.API.Services.Interfaces.Users;
 using DataWarehouse.API.Utils.Hash;
 using DataWarehouse.API.Utils.Jwt;
+using DataWarehouse.API.Utils.Redis;
 using DataWarehouse.Models.DTOs;
 using DataWarehouse.Models.Entities;
 using DataWarehouse.Models.Enums;
 using DataWarehouse.Models.Interfaces;
-using DataWarehouse.Utils.Redis;
 
 namespace DataWarehouse.API.Services.Implementation.Users
 {
@@ -45,10 +45,6 @@ namespace DataWarehouse.API.Services.Implementation.Users
             if (newRole != UserRole.Owner && dto.CompanyId == null)
                 throw new Exception("Only Owner can register without a Company.");
 
-            var companyAdminCount = dto.CompanyId.HasValue
-                ? await _users.CountCompanyAdminsAsync(dto.CompanyId.Value)
-                : 0;
-
             if (currentUser is null)
             {
                 if (newRole == UserRole.Owner)
@@ -57,18 +53,19 @@ namespace DataWarehouse.API.Services.Implementation.Users
                 }
                 else
                 {
-                    if (companyAdminCount > 0)
-                        throw new Exception("An admin already exists for this company. Authentication required.");
-
-                    if (newRole != UserRole.Admin)
-                        throw new Exception("The first account for a company must be an Admin.");
+                    throw new Exception("Only Owner can register the first Admin.");
                 }
             }
             else
             {
+                var isRequesterOwner = string.Equals(currentUser.Role, "Owner", StringComparison.OrdinalIgnoreCase);
                 var isRequesterAdmin = string.Equals(currentUser.Role, "Admin", StringComparison.OrdinalIgnoreCase);
-                if (!isRequesterAdmin)
-                    throw new Exception("Only admin can create users.");
+
+                if (newRole == UserRole.Admin && !isRequesterOwner)
+                    throw new Exception("Only Owner can create the first Admin.");
+
+                if (newRole == UserRole.User && !isRequesterAdmin)
+                    throw new Exception("Only Admin can create users.");
             }
 
             var user = new User
@@ -82,6 +79,9 @@ namespace DataWarehouse.API.Services.Implementation.Users
                 PhoneNumber = dto.PhoneNumber,
                 Birthday = dto.Birthday,
                 CompanyId = dto.CompanyId,
+                JobTitle = dto.JobTitle,
+                Department = dto.Department,
+                ProfileImageUrl = dto.ProfileImageUrl,
                 Role = newRole
             };
 
@@ -101,6 +101,9 @@ namespace DataWarehouse.API.Services.Implementation.Users
             if (!string.IsNullOrWhiteSpace(dto.LastName)) target.LastName = dto.LastName;
             if (!string.IsNullOrWhiteSpace(dto.Email)) target.Email = dto.Email;
             if (!string.IsNullOrWhiteSpace(dto.PhoneNumber)) target.PhoneNumber = dto.PhoneNumber;
+            if (!string.IsNullOrWhiteSpace(dto.JobTitle)) target.JobTitle = dto.JobTitle;
+            if (!string.IsNullOrWhiteSpace(dto.Department)) target.Department = dto.Department;
+            if (!string.IsNullOrWhiteSpace(dto.ProfileImageUrl)) target.ProfileImageUrl = dto.ProfileImageUrl;
             if (dto.Birthday.HasValue) target.Birthday = dto.Birthday;
 
             if (!string.IsNullOrWhiteSpace(dto.NewPassword))
@@ -161,6 +164,10 @@ namespace DataWarehouse.API.Services.Implementation.Users
             if (user == null || !_hash.VerifyPassword(user.PasswordHash, dto.Password))
                 throw new Exception("Invalid username or password.");
 
+            var now = DateTime.UtcNow;
+            await _users.UpdateLastLoginAsync(user.Id, now);
+            user.LastLoginAt = now; 
+            
             var accessToken = _jwt.GenerateJwtToken(user);
             var refreshToken = GenerateOpaqueToken();
 
@@ -185,8 +192,9 @@ namespace DataWarehouse.API.Services.Implementation.Users
             var record = await _redis.GetCacheAsync<RefreshRecord>(key);
             if (record == null)
                 throw new Exception("Invalid or expired refresh token.");
-
-            await _redis.DeleteCacheAsync(key);
+            
+            if (!string.IsNullOrWhiteSpace(key))
+                await _redis.DeleteCacheAsync(key);
             var newRefresh = GenerateOpaqueToken();
             await _redis.SetCacheAsync(RefreshKey(newRefresh), new RefreshRecord { Username = record.Username }, RefreshTtl);
 
@@ -204,11 +212,18 @@ namespace DataWarehouse.API.Services.Implementation.Users
 
         public async Task LogoutAsync(string refreshToken)
         {
-            if (string.IsNullOrWhiteSpace(refreshToken)) return;
-            await _redis.DeleteCacheAsync(RefreshKey(refreshToken));
+            if (string.IsNullOrWhiteSpace(refreshToken))
+                return;
+
+            var key = RefreshKey(refreshToken!);
+            await _redis.DeleteCacheAsync(key);
         }
 
-        private static string RefreshKey(string refreshToken) => $"refresh:{refreshToken}";
+        private static string RefreshKey(string refreshToken)
+        {
+            ArgumentNullException.ThrowIfNull(refreshToken);
+            return $"refresh:{refreshToken}";
+        }
 
         private static string GenerateOpaqueToken()
         {
@@ -226,6 +241,13 @@ namespace DataWarehouse.API.Services.Implementation.Users
             Email = u.Email,
             PhoneNumber = u.PhoneNumber,
             Birthday = u.Birthday,
+            JobTitle = u.JobTitle,
+            Department = u.Department,
+            ProfileImageUrl = u.ProfileImageUrl,
+            LastLoginAt = u.LastLoginAt,
+            IsActive = u.IsActive,
+            CreatedAt = u.CreatedAt,
+            UpdatedAt = u.UpdatedAt,
             CompanyId = u.CompanyId,
             CompanyName = u.Company?.Name ?? string.Empty,
             Role = u.Role.ToString()
