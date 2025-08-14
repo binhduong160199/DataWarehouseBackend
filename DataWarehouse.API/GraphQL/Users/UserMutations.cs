@@ -30,7 +30,6 @@ namespace DataWarehouse.API.GraphQL.Users
                 ProfileImageUrl = input.ProfileImageUrl,
                 CompanyId = input.CompanyId,
                 Role = input.Role,
-                IsAdminCreating = true
             };
             var requester = principal.GetUserIdentity();
             if (requester == null)

@@ -4,6 +4,8 @@ using DataWarehouse.API.Services.Interfaces.Users;
 using DataWarehouse.API.Utils.Hash;
 using DataWarehouse.API.Utils.Jwt;
 using DataWarehouse.API.Utils.Redis;
+using DataWarehouse.API.Utils.Mapping;
+using DataWarehouse.API.Utils.Authorization;
 using DataWarehouse.Models.DTOs;
 using DataWarehouse.Models.Entities;
 using DataWarehouse.Models.Enums;
@@ -17,22 +19,38 @@ namespace DataWarehouse.API.Services.Implementation.Users
         private readonly IHashUtility _hash;
         private readonly IJwtUtility _jwt;
         private readonly RedisHelper _redis;
+        private readonly ILogger<UserService> _logger;
 
         private static readonly TimeSpan AccessTtl = TimeSpan.FromMinutes(15);
         private static readonly TimeSpan RefreshTtl = TimeSpan.FromDays(7);
+        private static readonly TimeSpan UserCacheTtl = TimeSpan.FromHours(6);
 
-        public UserService(IUserRepository users, IHashUtility hash, IJwtUtility jwt, RedisHelper redis)
+        public UserService(
+            IUserRepository users,
+            IHashUtility hash,
+            IJwtUtility jwt,
+            RedisHelper redis,
+            ILogger<UserService> logger)
         {
             _users = users;
             _hash = hash;
             _jwt = jwt;
             _redis = redis;
+            _logger = logger;
         }
 
         public async Task<UserProfileDto?> GetByIdAsync(Guid id)
         {
+            var cacheKey = $"user:id:{id}";
+            var cached = await _redis.GetCacheAsync<UserProfileDto>(cacheKey);
+            if (cached != null) return cached;
+
             var user = await _users.GetByIdAsync(id);
-            return user == null ? null : ToProfile(user);
+            if (user == null) return null;
+
+            var profile = UserMapping.ToProfile(user);
+            await _redis.SetCacheAsync(cacheKey, profile, UserCacheTtl);
+            return profile;
         }
 
         public async Task<UserProfileDto> RegisterAsync(RegisterUserDto dto, IUserIdentity? currentUser)
@@ -40,33 +58,10 @@ namespace DataWarehouse.API.Services.Implementation.Users
             if (await _users.UserExistsAsync(dto.Username))
                 throw new Exception("Username already exists.");
 
-            var newRole = Enum.TryParse<UserRole>(dto.Role, true, out var parsedRole) ? parsedRole : UserRole.User;
+            var role = ParseRoleOrDefault(dto.Role);
+            await ValidateRegistrationPermissionsAsync(role, dto.CompanyId, currentUser);
 
-            if (newRole != UserRole.Owner && dto.CompanyId == null)
-                throw new Exception("Only Owner can register without a Company.");
-
-            if (currentUser is null)
-            {
-                if (newRole == UserRole.Owner)
-                {
-                    // allow anonymous Owner creation
-                }
-                else
-                {
-                    throw new Exception("Only Owner can register the first Admin.");
-                }
-            }
-            else
-            {
-                var isRequesterOwner = string.Equals(currentUser.Role, "Owner", StringComparison.OrdinalIgnoreCase);
-                var isRequesterAdmin = string.Equals(currentUser.Role, "Admin", StringComparison.OrdinalIgnoreCase);
-
-                if (newRole == UserRole.Admin && !isRequesterOwner)
-                    throw new Exception("Only Owner can create the first Admin.");
-
-                if (newRole == UserRole.User && !isRequesterAdmin)
-                    throw new Exception("Only Admin can create users.");
-            }
+            _logger.LogInformation("Registering new user {Username} with role {Role}", dto.Username, role);
 
             var user = new User
             {
@@ -82,17 +77,52 @@ namespace DataWarehouse.API.Services.Implementation.Users
                 JobTitle = dto.JobTitle,
                 Department = dto.Department,
                 ProfileImageUrl = dto.ProfileImageUrl,
-                Role = newRole
+                Role = role
             };
 
             await _users.AddUserAsync(user);
-            return ToProfile(user);
+            var profile = UserMapping.ToProfile(user);
+            await _redis.SetCacheAsync($"user:id:{user.Id}", profile, UserCacheTtl);
+
+            _logger.LogInformation("User {UserId} registered successfully", user.Id);
+            return profile;
+        }
+
+        private static UserRole ParseRoleOrDefault(string? roleString)
+        {
+            return Enum.TryParse<UserRole>(roleString, true, out var parsedRole) ? parsedRole : UserRole.User;
+        }
+
+        private async Task ValidateRegistrationPermissionsAsync(UserRole role, Guid? companyId, IUserIdentity? currentUser)
+        {
+            if (role != UserRole.Owner && companyId == null)
+                throw new Exception("Only Owner can register without a Company.");
+
+            if (currentUser is null)
+            {
+                if (role != UserRole.Owner)
+                    throw new Exception("Only Owner can register the first Admin.");
+                return;
+            }
+
+            var isOwner = RoleCheck.IsOwner(currentUser);
+            var isAdmin = RoleCheck.IsAdmin(currentUser);
+
+            if (role == UserRole.Admin)
+            {
+                var adminExists = companyId.HasValue && await _users.CountCompanyAdminsAsync(companyId.Value) > 0;
+                if (!adminExists && !isOwner)
+                    throw new Exception("Only Owner can create the first Admin.");
+            }
+
+            if (role == UserRole.User && !isAdmin)
+                throw new Exception("Only Admin can create users.");
         }
 
         public async Task<UserProfileDto> UpdateAsync(Guid targetUserId, UpdateUserDto dto, IUserIdentity requester)
         {
             var target = await _users.GetByIdAsync(targetUserId) ?? throw new Exception("User not found.");
-            var isAdmin = string.Equals(requester.Role, "Admin", StringComparison.OrdinalIgnoreCase);
+            var isAdmin = RoleCheck.IsAdmin(requester);
             var isSelf = requester.Id == targetUserId;
 
             if (!isAdmin && !isSelf) throw new Exception("Forbidden.");
@@ -134,7 +164,8 @@ namespace DataWarehouse.API.Services.Implementation.Users
             }
 
             await _users.UpdateUserAsync(target);
-            return ToProfile(target);
+            await _redis.DeleteCacheAsync($"user:id:{targetUserId}");
+            return UserMapping.ToProfile(target);
         }
 
         public async Task DeleteAsync(Guid targetUserId, IUserIdentity requester)
@@ -142,7 +173,7 @@ namespace DataWarehouse.API.Services.Implementation.Users
             var target = await _users.GetByIdAsync(targetUserId);
             if (target == null) return;
 
-            var isAdmin = string.Equals(requester.Role, "Admin", StringComparison.OrdinalIgnoreCase);
+            var isAdmin = RoleCheck.IsAdmin(requester);
             if (!isAdmin) throw new Exception("Forbidden.");
 
             if (target.Role == UserRole.Admin)
@@ -155,31 +186,43 @@ namespace DataWarehouse.API.Services.Implementation.Users
                     throw new Exception("Operation blocked: cannot delete the last admin in the company.");
             }
 
+            _logger.LogWarning("User {RequesterId} is deleting user {TargetUserId}", requester.Id, targetUserId);
             await _users.DeleteUserAsync(target);
+            await _redis.DeleteCacheAsync($"user:id:{targetUserId}");
+            _logger.LogInformation("User {TargetUserId} deleted successfully", targetUserId);
         }
 
         public async Task<AuthResponseDto> LoginAsync(LoginDto dto)
         {
+            _logger.LogInformation("Attempting login for user {Username}", dto.Username);
+
             var user = await _users.GetByUsernameAsync(dto.Username);
             if (user == null || !_hash.VerifyPassword(user.PasswordHash, dto.Password))
+            {
+                _logger.LogWarning("Login failed for user {Username}", dto.Username);
                 throw new Exception("Invalid username or password.");
+            }
 
             var now = DateTime.UtcNow;
             await _users.UpdateLastLoginAsync(user.Id, now);
-            user.LastLoginAt = now; 
-            
+            user.LastLoginAt = now;
+
+            await _redis.DeleteCacheAsync($"user:id:{user.Id}");
+
             var accessToken = _jwt.GenerateJwtToken(user);
             var refreshToken = GenerateOpaqueToken();
 
             var key = RefreshKey(refreshToken);
             await _redis.SetCacheAsync(key, new RefreshRecord { Username = user.Username }, RefreshTtl);
 
+            _logger.LogInformation("User {UserId} logged in successfully", user.Id);
+
             return new AuthResponseDto
             {
                 AccessToken = accessToken,
                 ExpiresAtUtc = DateTime.UtcNow.Add(AccessTtl),
                 RefreshToken = refreshToken,
-                User = ToProfile(user)
+                User = UserMapping.ToProfile(user)
             };
         }
 
@@ -192,9 +235,8 @@ namespace DataWarehouse.API.Services.Implementation.Users
             var record = await _redis.GetCacheAsync<RefreshRecord>(key);
             if (record == null)
                 throw new Exception("Invalid or expired refresh token.");
-            
-            if (!string.IsNullOrWhiteSpace(key))
-                await _redis.DeleteCacheAsync(key);
+
+            await _redis.DeleteCacheAsync(key);
             var newRefresh = GenerateOpaqueToken();
             await _redis.SetCacheAsync(RefreshKey(newRefresh), new RefreshRecord { Username = record.Username }, RefreshTtl);
 
@@ -206,7 +248,7 @@ namespace DataWarehouse.API.Services.Implementation.Users
                 AccessToken = access,
                 ExpiresAtUtc = DateTime.UtcNow.Add(AccessTtl),
                 RefreshToken = newRefresh,
-                User = ToProfile(user)
+                User = UserMapping.ToProfile(user)
             };
         }
 
@@ -215,7 +257,7 @@ namespace DataWarehouse.API.Services.Implementation.Users
             if (string.IsNullOrWhiteSpace(refreshToken))
                 return;
 
-            var key = RefreshKey(refreshToken!);
+            var key = RefreshKey(refreshToken);
             await _redis.DeleteCacheAsync(key);
         }
 
@@ -231,27 +273,6 @@ namespace DataWarehouse.API.Services.Implementation.Users
             RandomNumberGenerator.Fill(bytes);
             return Convert.ToBase64String(bytes);
         }
-
-        private static UserProfileDto ToProfile(User u) => new()
-        {
-            Id = u.Id,
-            Username = u.Username,
-            FirstName = u.FirstName,
-            LastName = u.LastName,
-            Email = u.Email,
-            PhoneNumber = u.PhoneNumber,
-            Birthday = u.Birthday,
-            JobTitle = u.JobTitle,
-            Department = u.Department,
-            ProfileImageUrl = u.ProfileImageUrl,
-            LastLoginAt = u.LastLoginAt,
-            IsActive = u.IsActive,
-            CreatedAt = u.CreatedAt,
-            UpdatedAt = u.UpdatedAt,
-            CompanyId = u.CompanyId,
-            CompanyName = u.Company?.Name ?? string.Empty,
-            Role = u.Role.ToString()
-        };
 
         private class RefreshRecord
         {
