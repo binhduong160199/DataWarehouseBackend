@@ -33,9 +33,49 @@ namespace DataWarehouse.API.GraphQL.Users
                 IsAdminCreating = true
             };
             var requester = principal.GetUserIdentity();
+            if (requester == null)
+                throw new GraphQLException("Unauthorized");
             return await users.RegisterAsync(dto, requester);
         }
 
+        public async Task<UserProfileDto> UpdateUser(
+            Guid userId,
+            UpdateUserInput input,
+            [Service] IUserService users,
+            ClaimsPrincipal principal)
+        {
+            var dto = new UpdateUserDto
+            {
+                FirstName = input.FirstName,
+                LastName = input.LastName,
+                Email = input.Email,
+                PhoneNumber = input.PhoneNumber,
+                Birthday = input.Birthday,
+                JobTitle = input.JobTitle,
+                Department = input.Department,
+                ProfileImageUrl = input.ProfileImageUrl,
+                Role = input.Role,
+                NewPassword = input.NewPassword
+            };
+
+            var requester = principal.GetUserIdentity();
+            if (requester == null)
+                throw new GraphQLException("Unauthorized");
+            return await users.UpdateAsync(userId, dto, requester);
+        }
+        
+        public async Task<bool> DeleteUser(
+            Guid userId,
+            [Service] IUserService users,
+            ClaimsPrincipal principal)
+        {
+            var requester = principal.GetUserIdentity();
+            if (requester == null)
+                throw new GraphQLException("Unauthorized");
+            await users.DeleteAsync(userId, requester);
+            return true;
+        }
+        
         public async Task<AuthResponseDto> Login(
             LoginInput input,
             [Service] IUserService users,

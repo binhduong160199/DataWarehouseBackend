@@ -11,5 +11,6 @@ namespace DataWarehouse.API.Repositories.Interfaces.Users
         Task DeleteUserAsync(User user);
         Task<bool> UserExistsAsync(string username);
         Task<int> CountCompanyAdminsAsync(Guid companyId);
+        Task UpdateLastLoginAsync(Guid userId, DateTime lastLogin);
     }
 }

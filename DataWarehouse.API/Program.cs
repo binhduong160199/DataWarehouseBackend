@@ -22,7 +22,7 @@ builder.Services.RegisterJwtAuthentication(builder.Configuration);
 builder.Services.RegisterCors(builder.Configuration);
 builder.Services.RegisterGraphQl(builder.Configuration);
 
-var logRepository = LogManager.GetRepository(Assembly.GetEntryAssembly());
+var logRepository = LogManager.GetRepository(Assembly.GetEntryAssembly()!);
 XmlConfigurator.Configure(logRepository, new FileInfo("log4net.config"));
 
 var app = builder.Build();

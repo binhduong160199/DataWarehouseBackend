@@ -64,5 +64,15 @@ namespace DataWarehouse.API.Repositories.Implementation.Users
                 .Where(u => u.CompanyId == companyId && u.Role == UserRole.Admin)
                 .CountAsync();
         }
+        
+        public async Task UpdateLastLoginAsync(Guid userId, DateTime lastLogin)
+        {
+            await using var db = await _dbContextFactory.CreateDbContextAsync();
+            var user = new User { Id = userId };
+            db.Users.Attach(user);
+            db.Entry(user).Property(u => u.LastLoginAt).CurrentValue = lastLogin;
+            db.Entry(user).Property(u => u.LastLoginAt).IsModified = true;
+            await db.SaveChangesAsync();
+        }
     }
 }

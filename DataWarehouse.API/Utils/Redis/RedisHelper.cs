@@ -1,9 +1,10 @@
+using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using StackExchange.Redis;
 
-namespace DataWarehouse.Utils.Redis;
+namespace DataWarehouse.API.Utils.Redis;
 
 public class RedisHelper
 {
@@ -44,7 +45,11 @@ public class RedisHelper
         await GetDatabase().StringSetAsync(key, serializedData, expiry);
     }
 
-    public async Task DeleteCacheAsync(string key) => await GetDatabase().KeyDeleteAsync(key);
+    public async Task DeleteCacheAsync(string? key)
+    {
+        if (string.IsNullOrWhiteSpace(key)) return;
+        await GetDatabase().KeyDeleteAsync(key);
+    }
 
     public async Task DeleteKeysByPatternAsync(string pattern)
     {
