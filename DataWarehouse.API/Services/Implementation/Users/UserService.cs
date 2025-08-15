@@ -6,6 +6,7 @@ using DataWarehouse.API.Utils.Jwt;
 using DataWarehouse.API.Utils.Redis;
 using DataWarehouse.API.Utils.Mapping;
 using DataWarehouse.API.Utils.Authorization;
+using DataWarehouse.API.Utils.Exceptions;
 using DataWarehouse.Models.DTOs;
 using DataWarehouse.Models.Entities;
 using DataWarehouse.Models.Enums;
@@ -56,7 +57,7 @@ namespace DataWarehouse.API.Services.Implementation.Users
         public async Task<UserProfileDto> RegisterAsync(RegisterUserDto dto, IUserIdentity? currentUser)
         {
             if (await _users.UserExistsAsync(dto.Username))
-                throw new Exception("Username already exists.");
+                throw new ValidationException("Username already exists.");
 
             var role = ParseRoleOrDefault(dto.Role);
             await ValidateRegistrationPermissionsAsync(role, dto.CompanyId, currentUser);
@@ -96,12 +97,12 @@ namespace DataWarehouse.API.Services.Implementation.Users
         private async Task ValidateRegistrationPermissionsAsync(UserRole role, Guid? companyId, IUserIdentity? currentUser)
         {
             if (role != UserRole.Owner && companyId == null)
-                throw new Exception("Only Owner can register without a Company.");
+                throw new ValidationException("Only Owner can register without a Company.");
 
             if (currentUser is null)
             {
                 if (role != UserRole.Owner)
-                    throw new Exception("Only Owner can register the first Admin.");
+                    throw new ForbiddenException("Only Owner can register the first Admin.");
                 return;
             }
 
@@ -112,20 +113,21 @@ namespace DataWarehouse.API.Services.Implementation.Users
             {
                 var adminExists = companyId.HasValue && await _users.CountCompanyAdminsAsync(companyId.Value) > 0;
                 if (!adminExists && !isOwner)
-                    throw new Exception("Only Owner can create the first Admin.");
+                    throw new ForbiddenException("Only Owner can create the first Admin.");
             }
 
             if (role == UserRole.User && !isAdmin)
-                throw new Exception("Only Admin can create users.");
+                throw new ForbiddenException("Only Admin can create users.");
         }
 
         public async Task<UserProfileDto> UpdateAsync(Guid targetUserId, UpdateUserDto dto, IUserIdentity requester)
         {
-            var target = await _users.GetByIdAsync(targetUserId) ?? throw new Exception("User not found.");
+            var target = await _users.GetByIdAsync(targetUserId) ?? throw new NotFoundException("User not found.");
             var isAdmin = RoleCheck.IsAdmin(requester);
             var isSelf = requester.Id == targetUserId;
 
-            if (!isAdmin && !isSelf) throw new Exception("Forbidden.");
+            if (!isAdmin && !isSelf)
+                throw new ForbiddenException("You are not allowed to update this user.");
 
             if (!string.IsNullOrWhiteSpace(dto.FirstName)) target.FirstName = dto.FirstName;
             if (!string.IsNullOrWhiteSpace(dto.LastName)) target.LastName = dto.LastName;
@@ -138,17 +140,18 @@ namespace DataWarehouse.API.Services.Implementation.Users
 
             if (!string.IsNullOrWhiteSpace(dto.NewPassword))
             {
-                if (!isSelf && !isAdmin) throw new Exception("Forbidden.");
+                if (!isSelf && !isAdmin)
+                    throw new ForbiddenException("You are not allowed to update this password.");
                 target.PasswordHash = _hash.HashPassword(dto.NewPassword);
             }
 
             if (!string.IsNullOrWhiteSpace(dto.Role))
             {
                 if (!isAdmin)
-                    throw new Exception("Only admin can change roles.");
+                    throw new ForbiddenException("Only admin can change roles.");
 
                 if (!Enum.TryParse<UserRole>(dto.Role, true, out var newRole))
-                    throw new Exception("Invalid role.");
+                    throw new ValidationException("Invalid role.");
 
                 if (target.Role == UserRole.Admin && newRole != UserRole.Admin)
                 {
@@ -157,7 +160,7 @@ namespace DataWarehouse.API.Services.Implementation.Users
                         : 0;
 
                     if (adminCount <= 1)
-                        throw new Exception("Operation blocked: at least one admin must remain in the company.");
+                        throw new ValidationException("At least one admin must remain in the company.");
                 }
 
                 target.Role = newRole;
@@ -171,10 +174,10 @@ namespace DataWarehouse.API.Services.Implementation.Users
         public async Task DeleteAsync(Guid targetUserId, IUserIdentity requester)
         {
             var target = await _users.GetByIdAsync(targetUserId);
-            if (target == null) return;
+            if (target == null) throw new NotFoundException("User not found.");
 
             var isAdmin = RoleCheck.IsAdmin(requester);
-            if (!isAdmin) throw new Exception("Forbidden.");
+            if (!isAdmin) throw new ForbiddenException("You are not allowed to delete this user.");
 
             if (target.Role == UserRole.Admin)
             {
@@ -183,7 +186,7 @@ namespace DataWarehouse.API.Services.Implementation.Users
                     : 0;
 
                 if (adminCount <= 1)
-                    throw new Exception("Operation blocked: cannot delete the last admin in the company.");
+                    throw new ValidationException("Cannot delete the last admin in the company.");
             }
 
             _logger.LogWarning("User {RequesterId} is deleting user {TargetUserId}", requester.Id, targetUserId);
@@ -200,7 +203,7 @@ namespace DataWarehouse.API.Services.Implementation.Users
             if (user == null || !_hash.VerifyPassword(user.PasswordHash, dto.Password))
             {
                 _logger.LogWarning("Login failed for user {Username}", dto.Username);
-                throw new Exception("Invalid username or password.");
+                throw new UnauthorizedException("Invalid username or password.");
             }
 
             var now = DateTime.UtcNow;
@@ -229,18 +232,20 @@ namespace DataWarehouse.API.Services.Implementation.Users
         public async Task<AuthResponseDto> RefreshAsync(string refreshToken)
         {
             if (string.IsNullOrWhiteSpace(refreshToken))
-                throw new Exception("Missing refresh token.");
+                throw new ValidationException("Missing refresh token.");
 
             var key = RefreshKey(refreshToken);
             var record = await _redis.GetCacheAsync<RefreshRecord>(key);
             if (record == null)
-                throw new Exception("Invalid or expired refresh token.");
+                throw new UnauthorizedException("Invalid or expired refresh token.");
 
             await _redis.DeleteCacheAsync(key);
             var newRefresh = GenerateOpaqueToken();
             await _redis.SetCacheAsync(RefreshKey(newRefresh), new RefreshRecord { Username = record.Username }, RefreshTtl);
 
-            var user = await _users.GetByUsernameAsync(record.Username) ?? throw new Exception("User not found.");
+            var user = await _users.GetByUsernameAsync(record.Username)
+                       ?? throw new NotFoundException("User not found.");
+
             var access = _jwt.GenerateJwtToken(user);
 
             return new AuthResponseDto

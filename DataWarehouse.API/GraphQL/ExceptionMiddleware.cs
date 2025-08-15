@@ -25,5 +25,33 @@ public class GraphQlExceptionMiddleware
                 .SetCode("FORBIDDEN")
                 .Build());
         }
+        catch (UnauthorizedException ex)
+        {
+            throw new GraphQLException(ErrorBuilder.New()
+                .SetMessage(ex.Message)
+                .SetCode("UNAUTHORIZED")
+                .Build());
+        }
+        catch (NotFoundException ex)
+        {
+            throw new GraphQLException(ErrorBuilder.New()
+                .SetMessage(ex.Message)
+                .SetCode("NOT_FOUND")
+                .Build());
+        }
+        catch (ValidationException ex)
+        {
+            throw new GraphQLException(ErrorBuilder.New()
+                .SetMessage(ex.Message)
+                .SetCode("VALIDATION_ERROR")
+                .Build());
+        }
+        catch (Exception ex)
+        {
+            throw new GraphQLException(ErrorBuilder.New()
+                .SetMessage("Internal Server Error: " + ex.Message)
+                .SetCode("INTERNAL_ERROR")
+                .Build());
+        }
     }
 }
