@@ -19,9 +19,6 @@ public class CompanyMutations
         if (requester is null)
             throw new GraphQLException("Unauthorized");
 
-        if (!RoleCheck.IsOwner(requester))
-            throw new GraphQLException("Only Owner can register a company.");
-
         var dto = new CreateUpdateCompanyDto
         {
             Name = input.Name,
@@ -45,7 +42,7 @@ public class CompanyMutations
         var requester = principal.GetUserIdentity();
         if (requester is null)
             throw new GraphQLException("Unauthorized");
-        
+
         var dto = new CreateUpdateCompanyDto
         {
             Name = input.Name,
@@ -57,7 +54,7 @@ public class CompanyMutations
             TaxId = input.TaxId,
             LogoUrl = input.LogoUrl
         };
-        
+
         return await companyService.UpdateAsync(input.Id, dto, requester);
     }
 
@@ -68,10 +65,9 @@ public class CompanyMutations
         [Service] ICompanyService companyService)
     {
         var requester = principal.GetUserIdentity();
-        
         if (requester is null)
             throw new GraphQLException("Unauthorized");
-        
+
         return await companyService.DeleteAsync(id, requester); 
     }
 }

@@ -90,10 +90,7 @@ namespace DataWarehouse.API.Services.Implementation.Companies
 
             var existing = await _repo.GetByIdAsync(id);
             if (existing == null)
-            {
-                _logger.LogWarning("Attempted to update non-existent company {Id}", id);
-                return null;
-            }
+                throw new NotFoundException($"Company {id} not found.");
 
             existing.Name = dto.Name;
             existing.Address = dto.Address;
@@ -123,10 +120,7 @@ namespace DataWarehouse.API.Services.Implementation.Companies
 
             var company = await _repo.GetByIdAsync(id);
             if (company == null)
-            {
-                _logger.LogWarning("Attempted to delete non-existent company {Id}", id);
-                return false;
-            }
+                throw new NotFoundException($"Company {id} not found.");
 
             await _repo.DeleteAsync(company);
 
