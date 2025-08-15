@@ -33,6 +33,7 @@ public static class ServiceRegistrationExtensions
             });
         services.AddValidatorsFromAssemblyContaining<CreateCompanyDtoValidator>();
         services.AddValidatorsFromAssemblyContaining<RegisterUserDtoValidator>();
+        services.AddValidatorsFromAssemblyContaining<LoginDtoValidator>();
         services.AddFluentValidationAutoValidation();
         services.AddScoped<IHashUtility, HashUtility>();
         services.AddSingleton<IJwtUtility, JwtUtility>();

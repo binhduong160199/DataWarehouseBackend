@@ -24,6 +24,7 @@ namespace DataWarehouse.API.Services.Implementation.Users
         private readonly ILogger<UserService> _logger;
         private readonly IValidator<RegisterUserDto> _registerValidator;
         private readonly IValidator<UpdateUserDto> _updateValidator;
+        private readonly IValidator<LoginDto> _loginValidator;
         private static readonly TimeSpan AccessTtl = TimeSpan.FromMinutes(15);
         private static readonly TimeSpan RefreshTtl = TimeSpan.FromDays(7);
         private static readonly TimeSpan UserCacheTtl = TimeSpan.FromHours(6);
@@ -35,7 +36,8 @@ namespace DataWarehouse.API.Services.Implementation.Users
             RedisHelper redis,
             ILogger<UserService> logger,
             IValidator<RegisterUserDto> registerValidator,
-            IValidator<UpdateUserDto> updateValidator)
+            IValidator<UpdateUserDto> updateValidator,
+            IValidator<LoginDto> loginValidator)
         {
             _users = users;
             _hash = hash;
@@ -44,6 +46,7 @@ namespace DataWarehouse.API.Services.Implementation.Users
             _logger = logger;
             _registerValidator = registerValidator;
             _updateValidator = updateValidator;
+            _loginValidator = loginValidator;
         }
 
         public async Task<UserProfileDto?> GetByIdAsync(Guid id)
@@ -207,6 +210,8 @@ namespace DataWarehouse.API.Services.Implementation.Users
 
         public async Task<AuthResponseDto> LoginAsync(LoginDto dto)
         {
+            await _loginValidator.ValidateAndThrowAsync(dto);
+            
             _logger.LogInformation("Attempting login for user {Username}", dto.Username);
 
             var user = await _users.GetByUsernameAsync(dto.Username);
