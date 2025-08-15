@@ -42,7 +42,10 @@ public class CompanyMutations
         var requester = principal.GetUserIdentity();
         if (requester is null)
             throw new GraphQLException("Unauthorized");
-
+        
+        if (string.IsNullOrWhiteSpace(input.Name))
+            throw new ValidationException("Company name is required.");
+        
         var dto = new CreateUpdateCompanyDto
         {
             Name = input.Name,
