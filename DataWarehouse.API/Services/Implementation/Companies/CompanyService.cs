@@ -7,6 +7,7 @@ using DataWarehouse.Models.DTOs;
 using DataWarehouse.Models.Entities;
 using DataWarehouse.Models.Interfaces;
 using DataWarehouse.API.Utils.Exceptions;
+using FluentValidation;
 
 namespace DataWarehouse.API.Services.Implementation.Companies
 {
@@ -15,17 +16,22 @@ namespace DataWarehouse.API.Services.Implementation.Companies
         private readonly ICompanyRepository _repo;
         private readonly RedisHelper _redis;
         private readonly ILogger<CompanyService> _logger;
-
+        private readonly IValidator<CreateCompanyDto> _createValidator;
+        private readonly IValidator<UpdateCompanyDto> _updateValidator;
         private static readonly TimeSpan CacheTtl = TimeSpan.FromHours(6);
 
         public CompanyService(
             ICompanyRepository repo,
             RedisHelper redis,
-            ILogger<CompanyService> logger)
+            ILogger<CompanyService> logger,
+            IValidator<CreateCompanyDto> createValidator,
+            IValidator<UpdateCompanyDto> updateValidator)
         {
             _repo = repo;
             _redis = redis;
             _logger = logger;
+            _createValidator = createValidator;
+            _updateValidator = updateValidator;
         }
 
         public async Task<IEnumerable<CompanyDto>> GetAllAsync()
@@ -55,8 +61,10 @@ namespace DataWarehouse.API.Services.Implementation.Companies
             return dto;
         }
 
-        public async Task<CompanyDto> CreateAsync(CreateUpdateCompanyDto dto, IUserIdentity requester)
+        public async Task<CompanyDto> CreateAsync(CreateCompanyDto dto, IUserIdentity requester)
         {
+            await _createValidator.ValidateAndThrowAsync(dto);
+            
             if (!RoleCheck.IsOwner(requester))
                 throw new ForbiddenException("Only Owner can create a company.");
 
@@ -83,8 +91,10 @@ namespace DataWarehouse.API.Services.Implementation.Companies
             return CompanyMapping.ToDto(company);
         }
 
-        public async Task<CompanyDto?> UpdateAsync(Guid id, CreateUpdateCompanyDto dto, IUserIdentity requester)
+        public async Task<CompanyDto?> UpdateAsync(Guid id, UpdateCompanyDto dto, IUserIdentity requester)
         {
+            await _updateValidator.ValidateAndThrowAsync(dto);
+            
             if (!RoleCheck.IsAdmin(requester) && !RoleCheck.IsOwner(requester))
                 throw new ForbiddenException("Only Admin or Owner can update a company.");
 
@@ -92,14 +102,14 @@ namespace DataWarehouse.API.Services.Implementation.Companies
             if (existing == null)
                 throw new NotFoundException($"Company {id} not found.");
 
-            existing.Name = dto.Name;
-            existing.Address = dto.Address;
-            existing.Website = dto.Website;
-            existing.ContactEmail = dto.ContactEmail;
-            existing.PhoneNumber = dto.PhoneNumber;
-            existing.Industry = dto.Industry;
-            existing.TaxId = dto.TaxId;
-            existing.LogoUrl = dto.LogoUrl;
+            if (dto.Name != null) existing.Name = dto.Name;
+            if (dto.Address != null) existing.Address = dto.Address;
+            if (dto.Website != null) existing.Website = dto.Website;
+            if (dto.ContactEmail != null) existing.ContactEmail = dto.ContactEmail;
+            if (dto.PhoneNumber != null) existing.PhoneNumber = dto.PhoneNumber;
+            if (dto.Industry != null) existing.Industry = dto.Industry;
+            if (dto.TaxId != null) existing.TaxId = dto.TaxId;
+            if (dto.LogoUrl != null) existing.LogoUrl = dto.LogoUrl;
             existing.UpdatedAt = DateTime.UtcNow;
 
             await _repo.UpdateAsync(existing);

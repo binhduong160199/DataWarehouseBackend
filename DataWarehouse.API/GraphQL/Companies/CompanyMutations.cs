@@ -19,7 +19,7 @@ public class CompanyMutations
         if (requester is null)
             throw new GraphQLException("Unauthorized");
 
-        var dto = new CreateUpdateCompanyDto
+        var dto = new CreateCompanyDto
         {
             Name = input.Name,
             Address = input.Address,
@@ -43,10 +43,7 @@ public class CompanyMutations
         if (requester is null)
             throw new GraphQLException("Unauthorized");
         
-        if (string.IsNullOrWhiteSpace(input.Name))
-            throw new ValidationException("Company name is required.");
-        
-        var dto = new CreateUpdateCompanyDto
+        var dto = new UpdateCompanyDto
         {
             Name = input.Name,
             Address = input.Address,
