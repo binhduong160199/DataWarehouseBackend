@@ -6,6 +6,7 @@ using DataWarehouse.API.Utils.Redis;
 using DataWarehouse.Models.DTOs;
 using DataWarehouse.Models.Entities;
 using DataWarehouse.Models.Interfaces;
+using DataWarehouse.API.Utils.Exceptions;
 
 namespace DataWarehouse.API.Services.Implementation.Companies
 {
@@ -57,7 +58,7 @@ namespace DataWarehouse.API.Services.Implementation.Companies
         public async Task<CompanyDto> CreateAsync(CreateUpdateCompanyDto dto, IUserIdentity requester)
         {
             if (!RoleCheck.IsOwner(requester))
-                throw new Exception("Only Owner can create a company.");
+                throw new ForbiddenException("Only Owner can create a company.");
 
             var company = new Company
             {
@@ -85,7 +86,7 @@ namespace DataWarehouse.API.Services.Implementation.Companies
         public async Task<CompanyDto?> UpdateAsync(Guid id, CreateUpdateCompanyDto dto, IUserIdentity requester)
         {
             if (!RoleCheck.IsAdmin(requester) && !RoleCheck.IsOwner(requester))
-                throw new Exception("Only Admin or Owner can update a company.");
+                throw new ForbiddenException("Only Admin or Owner can update a company.");
 
             var existing = await _repo.GetByIdAsync(id);
             if (existing == null)
@@ -118,7 +119,7 @@ namespace DataWarehouse.API.Services.Implementation.Companies
         public async Task<bool> DeleteAsync(Guid id, IUserIdentity requester)
         {
             if (!RoleCheck.IsOwner(requester))
-                throw new Exception("Only Owner can delete a company.");
+                throw new ForbiddenException("Only Owner can delete a company.");
 
             var company = await _repo.GetByIdAsync(id);
             if (company == null)

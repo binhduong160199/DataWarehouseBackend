@@ -111,6 +111,7 @@ public static class ServiceRegistrationExtensions
             .AddProjections()
             .AddFiltering()
             .AddSorting()
+            .UseField<GraphQlExceptionMiddleware>()
             .ModifyRequestOptions(o => o.IncludeExceptionDetails = true);
     }
 }
