@@ -11,6 +11,7 @@ using DataWarehouse.Models.DTOs;
 using DataWarehouse.Models.Entities;
 using DataWarehouse.Models.Enums;
 using DataWarehouse.Models.Interfaces;
+using FluentValidation;
 
 namespace DataWarehouse.API.Services.Implementation.Users
 {
@@ -21,7 +22,8 @@ namespace DataWarehouse.API.Services.Implementation.Users
         private readonly IJwtUtility _jwt;
         private readonly RedisHelper _redis;
         private readonly ILogger<UserService> _logger;
-
+        private readonly IValidator<RegisterUserDto> _registerValidator;
+        private readonly IValidator<UpdateUserDto> _updateValidator;
         private static readonly TimeSpan AccessTtl = TimeSpan.FromMinutes(15);
         private static readonly TimeSpan RefreshTtl = TimeSpan.FromDays(7);
         private static readonly TimeSpan UserCacheTtl = TimeSpan.FromHours(6);
@@ -31,13 +33,17 @@ namespace DataWarehouse.API.Services.Implementation.Users
             IHashUtility hash,
             IJwtUtility jwt,
             RedisHelper redis,
-            ILogger<UserService> logger)
+            ILogger<UserService> logger,
+            IValidator<RegisterUserDto> registerValidator,
+            IValidator<UpdateUserDto> updateValidator)
         {
             _users = users;
             _hash = hash;
             _jwt = jwt;
             _redis = redis;
             _logger = logger;
+            _registerValidator = registerValidator;
+            _updateValidator = updateValidator;
         }
 
         public async Task<UserProfileDto?> GetByIdAsync(Guid id)
@@ -56,6 +62,8 @@ namespace DataWarehouse.API.Services.Implementation.Users
 
         public async Task<UserProfileDto> RegisterAsync(RegisterUserDto dto, IUserIdentity? currentUser)
         {
+            await _registerValidator.ValidateAndThrowAsync(dto);
+            
             if (await _users.UserExistsAsync(dto.Username))
                 throw new ValidationException("Username already exists.");
 
@@ -122,6 +130,8 @@ namespace DataWarehouse.API.Services.Implementation.Users
 
         public async Task<UserProfileDto> UpdateAsync(Guid targetUserId, UpdateUserDto dto, IUserIdentity requester)
         {
+            await _updateValidator.ValidateAndThrowAsync(dto);
+            
             var target = await _users.GetByIdAsync(targetUserId) ?? throw new NotFoundException("User not found.");
             var isAdmin = RoleCheck.IsAdmin(requester);
             var isSelf = requester.Id == targetUserId;

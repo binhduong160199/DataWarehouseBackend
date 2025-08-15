@@ -15,6 +15,10 @@ using DataWarehouse.API.GraphQL;
 using DataWarehouse.API.GraphQL.Companies;
 using DataWarehouse.API.GraphQL.Users;
 using DataWarehouse.API.Utils.Redis;
+using FluentValidation;
+using FluentValidation.AspNetCore;
+using DataWarehouse.API.Utils.Validators.Companies;
+using DataWarehouse.API.Utils.Validators.Users;
 
 namespace DataWarehouse.API.Extensions;
 
@@ -27,6 +31,9 @@ public static class ServiceRegistrationExtensions
             {
                 options.JsonSerializerOptions.Converters.Add(new System.Text.Json.Serialization.JsonStringEnumConverter());
             });
+        services.AddValidatorsFromAssemblyContaining<CreateCompanyDtoValidator>();
+        services.AddValidatorsFromAssemblyContaining<RegisterUserDtoValidator>();
+        services.AddFluentValidationAutoValidation();
         services.AddScoped<IHashUtility, HashUtility>();
         services.AddSingleton<IJwtUtility, JwtUtility>();
         services.AddHttpContextAccessor();
